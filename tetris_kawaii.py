@@ -17,6 +17,10 @@ Remarque : comme pour Pac-Man Kawaii, il n'y a pas de bouton
 « Reprendre la partie » entre deux lancements du jeu (ce serait un peu
 étrange pour un jeu en temps réel). En revanche, une vraie pause est
 disponible pendant la partie (touche P ou bouton « Pause »).
+
+Petite musique de fond en boucle (bouton pour la couper dans le menu).
+Nécessite la bibliothèque pygame (pip install pygame) ; sans elle, le
+jeu fonctionne normalement, juste sans musique.
 """
 
 import json
@@ -25,6 +29,16 @@ import random
 import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox
+
+# La musique est optionnelle : si pygame n'est pas installé (pip install
+# pygame), le jeu fonctionne quand même, simplement sans musique.
+os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+try:
+    import pygame
+    pygame.mixer.init()
+    MUSIQUE_DISPONIBLE = True
+except Exception:
+    MUSIQUE_DISPONIBLE = False
 
 # ----- Dimensions du plateau -----
 
@@ -273,6 +287,11 @@ FICHIER_SAUVEGARDE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "tetris_kawaii_sauvegarde.json"
 )
 
+# Petite mélodie chiptune en boucle, propre à ce jeu.
+FICHIER_MUSIQUE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "musiques", "tetris.wav"
+)
+
 REGLES_DU_JEU = (
     "Les pièces tombent depuis le haut du plateau : à vous de les "
     "empiler pour compléter des lignes entières !\n\n"
@@ -323,6 +342,18 @@ def sauvegarder_donnees(donnees):
         messagebox.showwarning("Sauvegarde impossible", f"Impossible d'enregistrer la sauvegarde :\n{erreur}")
 
 
+def demarrer_musique():
+    """Lance la musique de fond en boucle (silencieux si pygame n'est
+    pas installé ou si le fichier audio est introuvable)."""
+    if not MUSIQUE_DISPONIBLE:
+        return
+    try:
+        pygame.mixer.music.load(FICHIER_MUSIQUE)
+        pygame.mixer.music.play(loops=-1)
+    except Exception:
+        pass
+
+
 def creer_bouton(parent, texte, commande, largeur=None):
     """Crée un bouton avec le style « kawaii » commun à tout le jeu."""
     return tk.Button(
@@ -355,6 +386,9 @@ class JeuTetris:
         self.cadre_stats = tk.Frame(self.fenetre, bg=COULEUR_FOND)
         self.cadre_regles = tk.Frame(self.fenetre, bg=COULEUR_FOND)
 
+        self.musique_active = MUSIQUE_DISPONIBLE
+        demarrer_musique()
+
         self.construire_ecran_jeu()
         self.construire_ecran_regles()
 
@@ -372,6 +406,14 @@ class JeuTetris:
         for cadre in (self.cadre_menu, self.cadre_jeu, self.cadre_stats, self.cadre_regles):
             cadre.pack_forget()
 
+    def basculer_musique(self):
+        if not MUSIQUE_DISPONIBLE:
+            return
+        self.musique_active = not self.musique_active
+        pygame.mixer.music.set_volume(1.0 if self.musique_active else 0.0)
+        if hasattr(self, "bouton_musique"):
+            self.bouton_musique.config(text="🔊 Musique" if self.musique_active else "🔇 Musique")
+
     # ----- Écran de menu -----
 
     def afficher_menu(self):
@@ -387,6 +429,13 @@ class JeuTetris:
         creer_bouton(self.cadre_menu, "📊 Statistiques", self.afficher_statistiques, LARGEUR_BOUTON_MENU).pack(pady=4)
         creer_bouton(self.cadre_menu, "📖 Règles du jeu", self.afficher_regles, LARGEUR_BOUTON_MENU).pack(pady=4)
         creer_bouton(self.cadre_menu, "🧹 Réinitialiser les statistiques", self.reinitialiser_statistiques, LARGEUR_BOUTON_MENU).pack(pady=4)
+
+        texte_musique = "🔊 Musique" if self.musique_active else "🔇 Musique"
+        self.bouton_musique = creer_bouton(self.cadre_menu, texte_musique, self.basculer_musique, LARGEUR_BOUTON_MENU)
+        self.bouton_musique.pack(pady=4)
+        if not MUSIQUE_DISPONIBLE:
+            self.bouton_musique.config(state="disabled", bg="#f6c9db", text="🔇 Musique (pygame requis)")
+
         creer_bouton(self.cadre_menu, "🚪 Quitter", self.fenetre.destroy, LARGEUR_BOUTON_MENU).pack(pady=(4, 0))
 
     def demarrer_nouvelle_partie_depuis_menu(self):
@@ -730,6 +779,8 @@ class JeuTetris:
     def fermer_fenetre(self):
         if self.id_boucle is not None:
             self.fenetre.after_cancel(self.id_boucle)
+        if MUSIQUE_DISPONIBLE:
+            pygame.mixer.music.stop()
         self.fenetre.destroy()
 
 

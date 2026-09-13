@@ -15,6 +15,10 @@ Remarque : contrairement au jeu de Mémoire, il n'y a pas de bouton
 pardon, les fantômes continuent de bouger en permanence), donc mettre
 une partie en pause pour la reprendre après avoir fermé le jeu n'aurait
 pas beaucoup de sens : on relance simplement une nouvelle partie.
+
+Petite musique de fond en boucle (bouton pour la couper dans le menu).
+Nécessite la bibliothèque pygame (pip install pygame) ; sans elle, le
+jeu fonctionne normalement, juste sans musique.
 """
 
 import json
@@ -23,6 +27,16 @@ import random
 import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox
+
+# La musique est optionnelle : si pygame n'est pas installé (pip install
+# pygame), le jeu fonctionne quand même, simplement sans musique.
+os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+try:
+    import pygame
+    pygame.mixer.init()
+    MUSIQUE_DISPONIBLE = True
+except Exception:
+    MUSIQUE_DISPONIBLE = False
 
 # ----- Dimensions du labyrinthe -----
 
@@ -91,6 +105,11 @@ FICHIER_SAUVEGARDE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "pacman_kawaii_sauvegarde.json"
 )
 
+# Petite mélodie chiptune en boucle, propre à ce jeu.
+FICHIER_MUSIQUE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "musiques", "pacman.wav"
+)
+
 REGLES_DU_JEU = (
     "Dirigez votre petit Pac-Man avec les flèches du clavier ↑ ↓ ← →.\n\n"
     "- Mangez toutes les petites gommes roses pour gagner des points.\n"
@@ -133,6 +152,18 @@ def sauvegarder_donnees(donnees):
             json.dump(donnees, fichier, ensure_ascii=False, indent=2)
     except OSError as erreur:
         messagebox.showwarning("Sauvegarde impossible", f"Impossible d'enregistrer la sauvegarde :\n{erreur}")
+
+
+def demarrer_musique():
+    """Lance la musique de fond en boucle (silencieux si pygame n'est
+    pas installé ou si le fichier audio est introuvable)."""
+    if not MUSIQUE_DISPONIBLE:
+        return
+    try:
+        pygame.mixer.music.load(FICHIER_MUSIQUE)
+        pygame.mixer.music.play(loops=-1)
+    except Exception:
+        pass
 
 
 def creer_bouton(parent, texte, commande, largeur=None):
@@ -193,6 +224,9 @@ class JeuPacman:
         self.cadre_stats = tk.Frame(self.fenetre, bg=COULEUR_FOND)
         self.cadre_regles = tk.Frame(self.fenetre, bg=COULEUR_FOND)
 
+        self.musique_active = MUSIQUE_DISPONIBLE
+        demarrer_musique()
+
         self.construire_ecran_jeu()
         self.construire_ecran_regles()
 
@@ -206,6 +240,14 @@ class JeuPacman:
     def masquer_tous_les_ecrans(self):
         for cadre in (self.cadre_menu, self.cadre_jeu, self.cadre_stats, self.cadre_regles):
             cadre.pack_forget()
+
+    def basculer_musique(self):
+        if not MUSIQUE_DISPONIBLE:
+            return
+        self.musique_active = not self.musique_active
+        pygame.mixer.music.set_volume(1.0 if self.musique_active else 0.0)
+        if hasattr(self, "bouton_musique"):
+            self.bouton_musique.config(text="🔊 Musique" if self.musique_active else "🔇 Musique")
 
     # ----- Écran de menu -----
 
@@ -222,6 +264,13 @@ class JeuPacman:
         creer_bouton(self.cadre_menu, "📊 Statistiques", self.afficher_statistiques, LARGEUR_BOUTON_MENU).pack(pady=4)
         creer_bouton(self.cadre_menu, "📖 Règles du jeu", self.afficher_regles, LARGEUR_BOUTON_MENU).pack(pady=4)
         creer_bouton(self.cadre_menu, "🧹 Réinitialiser les statistiques", self.reinitialiser_statistiques, LARGEUR_BOUTON_MENU).pack(pady=4)
+
+        texte_musique = "🔊 Musique" if self.musique_active else "🔇 Musique"
+        self.bouton_musique = creer_bouton(self.cadre_menu, texte_musique, self.basculer_musique, LARGEUR_BOUTON_MENU)
+        self.bouton_musique.pack(pady=4)
+        if not MUSIQUE_DISPONIBLE:
+            self.bouton_musique.config(state="disabled", bg="#f6c9db", text="🔇 Musique (pygame requis)")
+
         creer_bouton(self.cadre_menu, "🚪 Quitter", self.fenetre.destroy, LARGEUR_BOUTON_MENU).pack(pady=(4, 0))
 
     def demarrer_nouvelle_partie_depuis_menu(self):
@@ -634,6 +683,8 @@ class JeuPacman:
     def fermer_fenetre(self):
         if self.id_boucle is not None:
             self.fenetre.after_cancel(self.id_boucle)
+        if MUSIQUE_DISPONIBLE:
+            pygame.mixer.music.stop()
         self.fenetre.destroy()
 
 

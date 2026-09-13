@@ -5,12 +5,26 @@ Un petit oisillon pastel doit voler entre des piliers de bonbon sans
 les toucher. Cliquez (ou appuyez sur Espace) pour lui faire battre des
 ailes et prendre de l'altitude : la gravité le fait redescendre en
 continu, comme dans le Flappy Bird original.
+
+Petite musique de fond en boucle (bouton 🔊 en haut à gauche pour la
+couper). Nécessite la bibliothèque pygame (pip install pygame) ; sans
+elle, le jeu fonctionne normalement, juste sans musique.
 """
 
 import json
 import os
 import random
 import tkinter as tk
+
+# La musique est optionnelle : si pygame n'est pas installé, le jeu
+# fonctionne quand même, simplement sans musique.
+os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+try:
+    import pygame
+    pygame.mixer.init()
+    MUSIQUE_DISPONIBLE = True
+except Exception:
+    MUSIQUE_DISPONIBLE = False
 
 # ----- Constantes de la fenêtre et de la physique -----
 
@@ -59,6 +73,23 @@ POLICE_BOUTON = ("Comic Sans MS", 13, "bold")
 FICHIER_SAUVEGARDE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "flappy_kawaii_sauvegarde.json"
 )
+
+# Petite mélodie chiptune en boucle, propre à ce jeu.
+FICHIER_MUSIQUE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "musiques", "flappy.wav"
+)
+
+
+def demarrer_musique():
+    """Lance la musique de fond en boucle (silencieux si pygame n'est
+    pas installé ou si le fichier audio est introuvable)."""
+    if not MUSIQUE_DISPONIBLE:
+        return
+    try:
+        pygame.mixer.music.load(FICHIER_MUSIQUE)
+        pygame.mixer.music.play(loops=-1)
+    except Exception:
+        pass
 
 
 def charger_meilleur_score():
@@ -114,7 +145,24 @@ class JeuFlappy:
         self.id_boucle = None
         self.bouton_rejouer = None
 
+        self.musique_active = MUSIQUE_DISPONIBLE
+        demarrer_musique()
+        self.bouton_musique = tk.Button(
+            self.canvas, text="🔊" if MUSIQUE_DISPONIBLE else "🔇", font=POLICE_INFO,
+            command=self.basculer_musique, bg=COULEUR_BOUTON, fg="#ffffff",
+            activebackground=COULEUR_BOUTON_SURVOL, activeforeground="#ffffff",
+            relief="flat", bd=0, padx=6, pady=2, cursor="hand2",
+            state="normal" if MUSIQUE_DISPONIBLE else "disabled",
+        )
+
         self.nouvelle_partie()
+
+    def basculer_musique(self):
+        if not MUSIQUE_DISPONIBLE:
+            return
+        self.musique_active = not self.musique_active
+        pygame.mixer.music.set_volume(1.0 if self.musique_active else 0.0)
+        self.bouton_musique.config(text="🔊" if self.musique_active else "🔇")
 
     # ----- Décor (dessiné une seule fois par partie, ne bouge pas) -----
 
@@ -222,6 +270,7 @@ class JeuFlappy:
 
         self.canvas.delete("all")
         self.dessiner_decor()
+        self.canvas.create_window(30, 25, window=self.bouton_musique)
 
         self.oiseau_y = HAUTEUR_FENETRE / 2
         self.vitesse_y = 0
@@ -358,6 +407,8 @@ class JeuFlappy:
     def fermer_fenetre(self):
         if self.id_boucle is not None:
             self.fenetre.after_cancel(self.id_boucle)
+        if MUSIQUE_DISPONIBLE:
+            pygame.mixer.music.stop()
         self.fenetre.destroy()
 
 

@@ -17,6 +17,9 @@ Fonctionnalités :
 - Tout se passe dans une seule et même fenêtre : le menu, la partie,
   les statistiques et les règles sont de simples écrans que l'on
   affiche ou masque à l'intérieur de cette fenêtre.
+- Petite musique de fond en boucle (bouton pour la couper). Nécessite
+  la bibliothèque pygame (pip install pygame) ; sans elle, le jeu
+  fonctionne normalement, juste sans musique.
 """
 
 import json
@@ -25,6 +28,16 @@ import random
 import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox, ttk
+
+# La musique est optionnelle : si pygame n'est pas installé (pip install
+# pygame), le jeu fonctionne quand même, simplement sans musique.
+os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+try:
+    import pygame
+    pygame.mixer.init()
+    MUSIQUE_DISPONIBLE = True
+except Exception:
+    MUSIQUE_DISPONIBLE = False
 
 # ----- Constantes de configuration -----
 
@@ -74,6 +87,11 @@ FICHIER_SAUVEGARDE = os.path.join(
 
 # Nombre maximal de parties conservées dans l'historique.
 TAILLE_HISTORIQUE = 20
+
+# Petite mélodie chiptune en boucle, propre à ce jeu.
+FICHIER_MUSIQUE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "musiques", "memoire.wav"
+)
 
 REGLES_DU_JEU = (
     "Le but du jeu est de retrouver toutes les paires de cartes identiques.\n\n"
@@ -128,6 +146,18 @@ def sauvegarder_donnees(donnees):
             "Sauvegarde impossible",
             f"Impossible d'enregistrer la sauvegarde :\n{erreur}",
         )
+
+
+def demarrer_musique():
+    """Lance la musique de fond en boucle (silencieux si pygame n'est
+    pas installé ou si le fichier audio est introuvable)."""
+    if not MUSIQUE_DISPONIBLE:
+        return
+    try:
+        pygame.mixer.music.load(FICHIER_MUSIQUE)
+        pygame.mixer.music.play(loops=-1)
+    except Exception:
+        pass
 
 
 def creer_bouton(parent, texte, commande, largeur=None):
@@ -193,9 +223,20 @@ class JeuMemoire:
         self.cadre_stats = tk.Frame(self.fenetre, bg=COULEUR_FOND)
         self.cadre_regles = tk.Frame(self.fenetre, bg=COULEUR_FOND)
 
+        self.musique_active = MUSIQUE_DISPONIBLE
+        demarrer_musique()
+
         self.construire_ecran_jeu()
         self.construire_ecran_regles()
         self.afficher_menu()
+
+    def basculer_musique(self):
+        if not MUSIQUE_DISPONIBLE:
+            return
+        self.musique_active = not self.musique_active
+        pygame.mixer.music.set_volume(1.0 if self.musique_active else 0.0)
+        if hasattr(self, "bouton_musique"):
+            self.bouton_musique.config(text="🔊 Musique" if self.musique_active else "🔇 Musique")
 
     def masquer_tous_les_ecrans(self):
         for cadre in (self.cadre_menu, self.cadre_jeu, self.cadre_stats, self.cadre_regles):
@@ -240,6 +281,13 @@ class JeuMemoire:
         creer_bouton(self.cadre_menu, "📊 Statistiques", lambda: self.afficher_statistiques("menu"), LARGEUR_BOUTON_MENU).pack(pady=4)
         creer_bouton(self.cadre_menu, "📖 Règles du jeu", self.afficher_regles, LARGEUR_BOUTON_MENU).pack(pady=4)
         creer_bouton(self.cadre_menu, "🧹 Réinitialiser les statistiques", self.reinitialiser_statistiques, LARGEUR_BOUTON_MENU).pack(pady=4)
+
+        texte_musique = "🔊 Musique" if self.musique_active else "🔇 Musique"
+        self.bouton_musique = creer_bouton(self.cadre_menu, texte_musique, self.basculer_musique, LARGEUR_BOUTON_MENU)
+        self.bouton_musique.pack(pady=4)
+        if not MUSIQUE_DISPONIBLE:
+            self.bouton_musique.config(state="disabled", bg="#f6c9db", text="🔇 Musique (pygame requis)")
+
         creer_bouton(self.cadre_menu, "🚪 Quitter", self.fenetre.destroy, LARGEUR_BOUTON_MENU).pack(pady=(4, 0))
 
     def demarrer_nouvelle_partie_depuis_menu(self):
@@ -634,6 +682,8 @@ class JeuMemoire:
         fenêtre, pour pouvoir la reprendre plus tard."""
         self.arreter_chrono()
         self.sauvegarder_partie_en_cours()
+        if MUSIQUE_DISPONIBLE:
+            pygame.mixer.music.stop()
         self.fenetre.destroy()
 
 
