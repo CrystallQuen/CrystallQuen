@@ -4,9 +4,9 @@ Tetris Kawaii en Python avec Tkinter.
 Les pièces colorées tombent depuis le haut du plateau : il faut les
 empiler pour compléter des lignes entières, qui disparaissent alors et
 rapportent des points. Plus vous en faites disparaître d'un coup, plus
-le bonus est gros ! En plus des 7 pièces classiques, quelques formes
-bonus plus originales (croix, escalier, cœur) apparaissent de temps en
-temps pour varier le jeu.
+le bonus est gros ! En plus des 7 pièces classiques, 18 formes bonus
+plus originales (croix, escalier, cœur, pentominos, maison, fleur...)
+apparaissent de temps en temps pour varier le jeu.
 
 Comme le jeu de Mémoire, tout se passe dans une seule fenêtre : un
 menu de démarrage permet de lancer une partie, de consulter les
@@ -81,6 +81,8 @@ PIECES_CLASSIQUES = {
 }
 
 # ----- Formes bonus « kawaii », plus rares, en plus des 7 classiques -----
+# Les 3 premières, puis 10 pentominos classiques (renommés en mode kawaii)
+# et 5 formes originales supplémentaires, pour varier encore plus le jeu.
 PIECES_BONUS = {
     "CROIX": [[(0, 1), (1, 0), (1, 1), (1, 2), (2, 1)]] * 4,
     "ESCALIER": [
@@ -94,6 +96,96 @@ PIECES_BONUS = {
         [(0, 2), (2, 2), (0, 1), (1, 1), (2, 1), (1, 0)],
         [(2, 2), (2, 0), (1, 2), (1, 1), (1, 0), (0, 1)],
         [(2, 0), (0, 0), (2, 1), (1, 1), (0, 1), (1, 2)],
+    ],
+    "PAPILLON": [
+        [(0, 1), (0, 2), (1, 0), (1, 1), (2, 1)],
+        [(1, 2), (2, 2), (0, 1), (1, 1), (1, 0)],
+        [(2, 1), (2, 0), (1, 2), (1, 1), (0, 1)],
+        [(1, 0), (0, 0), (2, 1), (1, 1), (1, 2)],
+    ],
+    "BAGUETTE": [
+        [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4)],
+        [(0, 0), (1, 0), (2, 0), (3, 0), (4, 0)],
+        [(0, 4), (0, 3), (0, 2), (0, 1), (0, 0)],
+        [(4, 0), (3, 0), (2, 0), (1, 0), (0, 0)],
+    ],
+    "CANNE": [
+        [(0, 0), (1, 0), (2, 0), (3, 0), (3, 1)],
+        [(0, 3), (0, 2), (0, 1), (0, 0), (1, 0)],
+        [(3, 1), (2, 1), (1, 1), (0, 1), (0, 0)],
+        [(1, 0), (1, 1), (1, 2), (1, 3), (0, 3)],
+    ],
+    "SERPENT": [
+        [(0, 1), (1, 1), (2, 0), (2, 1), (3, 0)],
+        [(1, 3), (1, 2), (0, 1), (1, 1), (0, 0)],
+        [(3, 0), (2, 0), (1, 1), (1, 0), (0, 1)],
+        [(0, 0), (0, 1), (1, 2), (0, 2), (1, 3)],
+    ],
+    "NUAGE": [
+        [(0, 0), (0, 1), (1, 0), (1, 1), (2, 0)],
+        [(0, 2), (1, 2), (0, 1), (1, 1), (0, 0)],
+        [(2, 1), (2, 0), (1, 1), (1, 0), (0, 1)],
+        [(1, 0), (0, 0), (1, 1), (0, 1), (1, 2)],
+    ],
+    "PARAPLUIE": [
+        [(0, 0), (0, 1), (0, 2), (1, 1), (2, 1)],
+        [(0, 2), (1, 2), (2, 2), (1, 1), (1, 0)],
+        [(2, 2), (2, 1), (2, 0), (1, 1), (0, 1)],
+        [(2, 0), (1, 0), (0, 0), (1, 1), (1, 2)],
+    ],
+    "FER_A_CHEVAL": [
+        [(0, 0), (0, 2), (1, 0), (1, 1), (1, 2)],
+        [(0, 1), (2, 1), (0, 0), (1, 0), (2, 0)],
+        [(1, 2), (1, 0), (0, 2), (0, 1), (0, 0)],
+        [(2, 0), (0, 0), (2, 1), (1, 1), (0, 1)],
+    ],
+    "EQUERRE": [
+        [(0, 0), (1, 0), (2, 0), (2, 1), (2, 2)],
+        [(0, 2), (0, 1), (0, 0), (1, 0), (2, 0)],
+        [(2, 2), (1, 2), (0, 2), (0, 1), (0, 0)],
+        [(2, 0), (2, 1), (2, 2), (1, 2), (0, 2)],
+    ],
+    "BRANCHE": [
+        [(0, 1), (1, 0), (1, 1), (2, 1), (3, 1)],
+        [(1, 3), (0, 2), (1, 2), (1, 1), (1, 0)],
+        [(3, 0), (2, 1), (2, 0), (1, 0), (0, 0)],
+        [(0, 0), (1, 1), (0, 1), (0, 2), (0, 3)],
+    ],
+    "ECLAIR": [
+        [(0, 0), (0, 1), (1, 1), (2, 1), (2, 2)],
+        [(0, 2), (1, 2), (1, 1), (1, 0), (2, 0)],
+        [(2, 2), (2, 1), (1, 1), (0, 1), (0, 0)],
+        [(2, 0), (1, 0), (1, 1), (1, 2), (0, 2)],
+    ],
+    "MAISON": [
+        [(0, 1), (1, 0), (1, 1), (1, 2), (2, 0), (2, 2)],
+        [(1, 2), (0, 1), (1, 1), (2, 1), (0, 0), (2, 0)],
+        [(2, 1), (1, 2), (1, 1), (1, 0), (0, 2), (0, 0)],
+        [(1, 0), (2, 1), (1, 1), (0, 1), (2, 2), (0, 2)],
+    ],
+    "FLEUR": [
+        [(0, 1), (1, 0), (1, 1), (1, 2), (2, 1), (3, 1)],
+        [(1, 3), (0, 2), (1, 2), (2, 2), (1, 1), (1, 0)],
+        [(3, 1), (2, 2), (2, 1), (2, 0), (1, 1), (0, 1)],
+        [(1, 0), (2, 1), (1, 1), (0, 1), (1, 2), (1, 3)],
+    ],
+    "SABLIER": [
+        [(0, 0), (0, 1), (1, 1), (2, 0), (2, 1)],
+        [(0, 2), (1, 2), (1, 1), (0, 0), (1, 0)],
+        [(2, 1), (2, 0), (1, 0), (0, 1), (0, 0)],
+        [(1, 0), (0, 0), (0, 1), (1, 2), (0, 2)],
+    ],
+    "ANCRE": [
+        [(0, 1), (1, 1), (2, 0), (2, 1), (2, 2), (3, 1)],
+        [(1, 3), (1, 2), (0, 1), (1, 1), (2, 1), (1, 0)],
+        [(3, 1), (2, 1), (1, 2), (1, 1), (1, 0), (0, 1)],
+        [(1, 0), (1, 1), (2, 2), (1, 2), (0, 2), (1, 3)],
+    ],
+    "CLE": [
+        [(0, 0), (0, 1), (1, 0), (1, 1), (2, 1), (3, 1)],
+        [(0, 3), (1, 3), (0, 2), (1, 2), (1, 1), (1, 0)],
+        [(3, 1), (3, 0), (2, 1), (2, 0), (1, 0), (0, 0)],
+        [(1, 0), (0, 0), (1, 1), (0, 1), (0, 2), (0, 3)],
     ],
 }
 
@@ -130,6 +222,21 @@ COULEURS_PIECES = {
     "CROIX": "#ffd1dc",
     "ESCALIER": "#d4b8ff",
     "COEUR": "#ff6f91",
+    "PAPILLON": "#ffb3de",
+    "BAGUETTE": "#e0bbff",
+    "CANNE": "#ffcc99",
+    "SERPENT": "#baffc9",
+    "NUAGE": "#bae1ff",
+    "PARAPLUIE": "#ffdfba",
+    "FER_A_CHEVAL": "#d5aaff",
+    "EQUERRE": "#c9ffd8",
+    "BRANCHE": "#e8d5b7",
+    "ECLAIR": "#fff2a8",
+    "MAISON": "#ffcccb",
+    "FLEUR": "#ffb7ce",
+    "SABLIER": "#b5ead7",
+    "ANCRE": "#a8dadc",
+    "CLE": "#f1c0e8",
 }
 
 POLICE_TITRE = ("Comic Sans MS", 22, "bold")
@@ -158,8 +265,9 @@ REGLES_DU_JEU = (
     "10 lignes. La partie se termine quand les pièces atteignent le "
     "haut du plateau.\n\n"
     "De temps en temps, une forme bonus plus originale apparaît (une "
-    "croix, un escalier ou même un petit cœur !) : elle rapporte "
-    "quelques points de plus dès qu'elle se pose."
+    "croix, un escalier, un cœur, une maison, une fleur, une clé et "
+    "bien d'autres !) : elle rapporte quelques points de plus dès "
+    "qu'elle se pose."
 )
 
 
