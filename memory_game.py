@@ -14,7 +14,9 @@ Fonctionnalités :
   parties dans un fichier JSON à côté de ce script.
 - Reprise d'une partie interrompue (retour au menu ou fermeture de la
   fenêtre en cours de jeu).
-- Fenêtre de statistiques (records, moyenne de coups/temps, historique).
+- Tout se passe dans une seule et même fenêtre : le menu, la partie,
+  les statistiques et les règles sont de simples écrans que l'on
+  affiche ou masque à l'intérieur de cette fenêtre.
 """
 
 import json
@@ -41,9 +43,25 @@ SYMBOLES_DISPONIBLES = [
     "🍉", "🥥", "🍈", "🐶", "🐱", "🐵", "🦊", "🐼", "🐸",
 ]
 
-COULEUR_CACHEE = "#4a90d9"      # couleur d'une carte face cachée
-COULEUR_DECOUVERTE = "#f5f5f5"  # couleur d'une carte retournée
-COULEUR_TROUVEE = "#a5d6a7"     # couleur d'une paire trouvée
+SYMBOLE_DOS_CARTE = "💗"  # petit cœur affiché au dos des cartes cachées
+
+# ----- Palette de couleurs « kawaii » (tons pastel) -----
+COULEUR_FOND = "#fff0f6"          # rose très clair, fond de toute la fenêtre
+COULEUR_CACHEE = "#c9a8ff"        # lavande, carte face cachée
+COULEUR_DECOUVERTE = "#fff6da"    # crème, carte retournée (pas encore validée)
+COULEUR_TROUVEE = "#baf2d0"       # menthe pastel, paire trouvée
+COULEUR_BOUTON = "#f48fb1"        # rose bonbon, boutons
+COULEUR_BOUTON_SURVOL = "#f76fa0"  # rose un peu plus soutenu au clic
+COULEUR_TITRE = "#d6336c"         # rose vif, titres
+COULEUR_TEXTE = "#7c4a9e"         # violet doux, texte normal
+
+# ----- Polices « kawaii » (arrondies) -----
+POLICE_TITRE = ("Comic Sans MS", 22, "bold")
+POLICE_SOUS_TITRE = ("Comic Sans MS", 11, "italic")
+POLICE_BOUTON = ("Comic Sans MS", 12, "bold")
+POLICE_INFO = ("Comic Sans MS", 11, "bold")
+POLICE_CARTE = ("Comic Sans MS", 16, "bold")
+POLICE_TEXTE = ("Comic Sans MS", 10)
 
 DELAI_RETOURNEMENT_MS = 1000  # délai (ms) avant de recacher deux cartes
 
@@ -112,15 +130,45 @@ def sauvegarder_donnees(donnees):
         )
 
 
+def creer_bouton(parent, texte, commande, largeur=None):
+    """Crée un bouton avec le style « kawaii » commun à tout le jeu."""
+    return tk.Button(
+        parent,
+        text=texte,
+        font=POLICE_BOUTON,
+        command=commande,
+        bg=COULEUR_BOUTON,
+        fg="#ffffff",
+        activebackground=COULEUR_BOUTON_SURVOL,
+        activeforeground="#ffffff",
+        relief="flat",
+        bd=0,
+        padx=14,
+        pady=6,
+        width=largeur,
+        cursor="hand2",
+    )
+
+
 class JeuMemoire:
-    """Classe principale qui gère la fenêtre, le menu et la logique du jeu."""
+    """Classe principale qui gère la fenêtre, les écrans et la logique du jeu."""
 
     def __init__(self, fenetre):
         self.fenetre = fenetre
         self.fenetre.title("Jeu de Mémoire")
-        self.fenetre.configure(bg="#ffffff")
+        self.fenetre.configure(bg=COULEUR_FOND)
         self.fenetre.resizable(False, False)
         self.fenetre.protocol("WM_DELETE_WINDOW", self.fermer_fenetre)
+
+        # Petite touche de style pour le menu déroulant de difficulté.
+        style = ttk.Style(self.fenetre)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+        style.configure(
+            "TCombobox", fieldbackground=COULEUR_DECOUVERTE, background=COULEUR_BOUTON,
+        )
 
         self.donnees = charger_donnees()
 
@@ -133,34 +181,47 @@ class JeuMemoire:
         self.partie_terminee = True  # aucune partie n'a encore démarré
         self.boutons = []
         self.dernier_resultat_est_record = False
+        self.ecran_precedent = "menu"  # pour savoir où revenir depuis les statistiques
 
         difficulte_initiale = self.donnees.get("derniere_difficulte") or next(iter(DIFFICULTES))
         self.difficulte_var = tk.StringVar(value=difficulte_initiale)
 
-        # Deux écrans distincts dans la même fenêtre : le menu principal
-        # et l'écran de jeu. On affiche l'un ou l'autre avec pack()/pack_forget().
-        self.cadre_menu = tk.Frame(self.fenetre, bg="#ffffff")
-        self.cadre_jeu = tk.Frame(self.fenetre, bg="#ffffff")
+        # Tous les écrans du jeu vivent dans la même fenêtre : on affiche
+        # l'un d'eux à la fois avec pack()/pack_forget().
+        self.cadre_menu = tk.Frame(self.fenetre, bg=COULEUR_FOND)
+        self.cadre_jeu = tk.Frame(self.fenetre, bg=COULEUR_FOND)
+        self.cadre_stats = tk.Frame(self.fenetre, bg=COULEUR_FOND)
+        self.cadre_regles = tk.Frame(self.fenetre, bg=COULEUR_FOND)
 
         self.construire_ecran_jeu()
+        self.construire_ecran_regles()
         self.afficher_menu()
+
+    def masquer_tous_les_ecrans(self):
+        for cadre in (self.cadre_menu, self.cadre_jeu, self.cadre_stats, self.cadre_regles):
+            cadre.pack_forget()
 
     # ----- Écran de menu -----
 
     def afficher_menu(self):
         """Construit (ou reconstruit) et affiche le menu de démarrage."""
-        self.cadre_jeu.pack_forget()
         for widget in self.cadre_menu.winfo_children():
             widget.destroy()
+        self.masquer_tous_les_ecrans()
         self.cadre_menu.pack(padx=30, pady=20)
 
         tk.Label(
-            self.cadre_menu, text="Jeu de Mémoire", font=("Helvetica", 20, "bold"), bg="#ffffff"
+            self.cadre_menu, text="✨ Jeu de Mémoire ✨", font=POLICE_TITRE,
+            fg=COULEUR_TITRE, bg=COULEUR_FOND,
+        ).pack(pady=(0, 2))
+        tk.Label(
+            self.cadre_menu, text="‧₊˚ Trouve toutes les paires ! ˚₊‧", font=POLICE_SOUS_TITRE,
+            fg=COULEUR_TEXTE, bg=COULEUR_FOND,
         ).pack(pady=(0, 15))
 
-        cadre_difficulte = tk.Frame(self.cadre_menu, bg="#ffffff")
+        cadre_difficulte = tk.Frame(self.cadre_menu, bg=COULEUR_FOND)
         cadre_difficulte.pack(pady=(0, 10))
-        tk.Label(cadre_difficulte, text="Difficulté :", bg="#ffffff").pack(side=tk.LEFT, padx=5)
+        tk.Label(cadre_difficulte, text="Difficulté :", font=POLICE_TEXTE, fg=COULEUR_TEXTE, bg=COULEUR_FOND).pack(side=tk.LEFT, padx=5)
         ttk.Combobox(
             cadre_difficulte,
             textvariable=self.difficulte_var,
@@ -169,38 +230,17 @@ class JeuMemoire:
             width=14,
         ).pack(side=tk.LEFT, padx=5)
 
-        tk.Button(
-            self.cadre_menu, text="Nouvelle partie", font=("Helvetica", 12),
-            width=LARGEUR_BOUTON_MENU, command=self.demarrer_nouvelle_partie_depuis_menu,
-        ).pack(pady=4)
+        creer_bouton(self.cadre_menu, "🎀 Nouvelle partie", self.demarrer_nouvelle_partie_depuis_menu, LARGEUR_BOUTON_MENU).pack(pady=4)
 
-        bouton_reprendre = tk.Button(
-            self.cadre_menu, text="Reprendre la partie", font=("Helvetica", 12),
-            width=LARGEUR_BOUTON_MENU, command=self.reprendre_partie_depuis_menu,
-        )
+        bouton_reprendre = creer_bouton(self.cadre_menu, "🍡 Reprendre la partie", self.reprendre_partie_depuis_menu, LARGEUR_BOUTON_MENU)
         bouton_reprendre.pack(pady=4)
         if not self.donnees.get("partie_en_cours"):
-            bouton_reprendre.config(state="disabled")
+            bouton_reprendre.config(state="disabled", bg="#f6c9db")
 
-        tk.Button(
-            self.cadre_menu, text="Statistiques", font=("Helvetica", 12),
-            width=LARGEUR_BOUTON_MENU, command=self.afficher_statistiques,
-        ).pack(pady=4)
-
-        tk.Button(
-            self.cadre_menu, text="Règles du jeu", font=("Helvetica", 12),
-            width=LARGEUR_BOUTON_MENU, command=self.afficher_regles,
-        ).pack(pady=4)
-
-        tk.Button(
-            self.cadre_menu, text="Réinitialiser les statistiques", font=("Helvetica", 12),
-            width=LARGEUR_BOUTON_MENU, command=self.reinitialiser_statistiques,
-        ).pack(pady=4)
-
-        tk.Button(
-            self.cadre_menu, text="Quitter", font=("Helvetica", 12),
-            width=LARGEUR_BOUTON_MENU, command=self.fenetre.destroy,
-        ).pack(pady=(4, 0))
+        creer_bouton(self.cadre_menu, "📊 Statistiques", lambda: self.afficher_statistiques("menu"), LARGEUR_BOUTON_MENU).pack(pady=4)
+        creer_bouton(self.cadre_menu, "📖 Règles du jeu", self.afficher_regles, LARGEUR_BOUTON_MENU).pack(pady=4)
+        creer_bouton(self.cadre_menu, "🧹 Réinitialiser les statistiques", self.reinitialiser_statistiques, LARGEUR_BOUTON_MENU).pack(pady=4)
+        creer_bouton(self.cadre_menu, "🚪 Quitter", self.fenetre.destroy, LARGEUR_BOUTON_MENU).pack(pady=(4, 0))
 
     def demarrer_nouvelle_partie_depuis_menu(self):
         if self.donnees.get("partie_en_cours") and not messagebox.askyesno(
@@ -217,16 +257,6 @@ class JeuMemoire:
             return
         self.reprendre_partie(partie_sauvee)
         self.afficher_ecran_jeu()
-
-    def afficher_regles(self):
-        fenetre_regles = tk.Toplevel(self.fenetre)
-        fenetre_regles.title("Règles du jeu")
-        fenetre_regles.configure(bg="#ffffff")
-        fenetre_regles.resizable(False, False)
-        tk.Label(
-            fenetre_regles, text=REGLES_DU_JEU, justify="left", wraplength=320,
-            bg="#ffffff", padx=15, pady=15,
-        ).pack()
 
     def reinitialiser_statistiques(self):
         if not messagebox.askyesno(
@@ -246,32 +276,32 @@ class JeuMemoire:
     def construire_ecran_jeu(self):
         """Crée une seule fois les widgets fixes de l'écran de jeu (les
         infos en haut et le cadre qui accueillera la grille de cartes)."""
-        cadre_info = tk.Frame(self.cadre_jeu, bg="#ffffff")
+        cadre_info = tk.Frame(self.cadre_jeu, bg=COULEUR_FOND)
         cadre_info.pack(pady=10)
 
-        self.label_difficulte_jeu = tk.Label(cadre_info, text="", font=("Helvetica", 11), bg="#ffffff")
+        self.label_difficulte_jeu = tk.Label(cadre_info, text="", font=POLICE_INFO, fg=COULEUR_TEXTE, bg=COULEUR_FOND)
         self.label_difficulte_jeu.pack(side=tk.LEFT, padx=8)
 
-        self.label_coups = tk.Label(cadre_info, text="Coups : 0", font=("Helvetica", 12, "bold"), bg="#ffffff")
+        self.label_coups = tk.Label(cadre_info, text="Coups : 0", font=POLICE_INFO, fg=COULEUR_TEXTE, bg=COULEUR_FOND)
         self.label_coups.pack(side=tk.LEFT, padx=8)
 
-        self.label_chrono = tk.Label(cadre_info, text="Temps : 0 s", font=("Helvetica", 12, "bold"), bg="#ffffff")
+        self.label_chrono = tk.Label(cadre_info, text="Temps : 0 s", font=POLICE_INFO, fg=COULEUR_TEXTE, bg=COULEUR_FOND)
         self.label_chrono.pack(side=tk.LEFT, padx=8)
 
-        self.label_record = tk.Label(cadre_info, text="Record : aucun", font=("Helvetica", 12), bg="#ffffff")
+        self.label_record = tk.Label(cadre_info, text="Record : aucun", font=POLICE_TEXTE, fg=COULEUR_TEXTE, bg=COULEUR_FOND)
         self.label_record.pack(side=tk.LEFT, padx=8)
 
-        self.cadre_grille = tk.Frame(self.cadre_jeu, bg="#ffffff")
+        self.cadre_grille = tk.Frame(self.cadre_jeu, bg=COULEUR_FOND)
         self.cadre_grille.pack(padx=10, pady=10)
 
-        cadre_boutons_jeu = tk.Frame(self.cadre_jeu, bg="#ffffff")
+        cadre_boutons_jeu = tk.Frame(self.cadre_jeu, bg=COULEUR_FOND)
         cadre_boutons_jeu.pack(pady=(0, 10))
-        tk.Button(cadre_boutons_jeu, text="Recommencer", font=("Helvetica", 11), command=self.demander_nouvelle_partie).pack(side=tk.LEFT, padx=5)
-        tk.Button(cadre_boutons_jeu, text="Statistiques", font=("Helvetica", 11), command=self.afficher_statistiques).pack(side=tk.LEFT, padx=5)
-        tk.Button(cadre_boutons_jeu, text="Menu principal", font=("Helvetica", 11), command=self.retour_menu).pack(side=tk.LEFT, padx=5)
+        creer_bouton(cadre_boutons_jeu, "🔄 Recommencer", self.demander_nouvelle_partie).pack(side=tk.LEFT, padx=5)
+        creer_bouton(cadre_boutons_jeu, "📊 Statistiques", lambda: self.afficher_statistiques("jeu")).pack(side=tk.LEFT, padx=5)
+        creer_bouton(cadre_boutons_jeu, "🏠 Menu principal", self.retour_menu).pack(side=tk.LEFT, padx=5)
 
     def afficher_ecran_jeu(self):
-        self.cadre_menu.pack_forget()
+        self.masquer_tous_les_ecrans()
         self.cadre_jeu.pack(padx=10, pady=10)
 
     def retour_menu(self):
@@ -381,14 +411,17 @@ class JeuMemoire:
         for ligne in range(lignes):
             for colonne in range(colonnes):
                 trouvee = self.cartes_trouvees[index]
+                couleur = COULEUR_TROUVEE if trouvee else COULEUR_CACHEE
                 bouton = tk.Button(
                     self.cadre_grille,
-                    text=self.symboles_grille[index] if trouvee else "",
-                    font=("Helvetica", 16),
+                    text=self.symboles_grille[index] if trouvee else SYMBOLE_DOS_CARTE,
+                    font=POLICE_CARTE,
                     width=4,
                     height=2,
-                    bg=COULEUR_TROUVEE if trouvee else COULEUR_CACHEE,
-                    activebackground=COULEUR_CACHEE,
+                    bg=couleur,
+                    activebackground=couleur,
+                    relief="flat",
+                    bd=0,
                     command=lambda i=index: self.clic_sur_carte(i),
                 )
                 bouton.grid(row=ligne, column=colonne, padx=4, pady=4)
@@ -421,7 +454,9 @@ class JeuMemoire:
         if len(self.cartes_retournees) >= 2:
             return
 
-        self.boutons[index].config(text=self.symboles_grille[index], bg=COULEUR_DECOUVERTE)
+        self.boutons[index].config(
+            text=self.symboles_grille[index], bg=COULEUR_DECOUVERTE, activebackground=COULEUR_DECOUVERTE,
+        )
         self.cartes_retournees.append(index)
 
         if len(self.cartes_retournees) == 2:
@@ -437,8 +472,8 @@ class JeuMemoire:
         if self.symboles_grille[index1] == self.symboles_grille[index2]:
             self.cartes_trouvees[index1] = True
             self.cartes_trouvees[index2] = True
-            self.boutons[index1].config(bg=COULEUR_TROUVEE)
-            self.boutons[index2].config(bg=COULEUR_TROUVEE)
+            self.boutons[index1].config(bg=COULEUR_TROUVEE, activebackground=COULEUR_TROUVEE)
+            self.boutons[index2].config(bg=COULEUR_TROUVEE, activebackground=COULEUR_TROUVEE)
             self.cartes_retournees = []
             self.clic_bloque = False
 
@@ -450,7 +485,9 @@ class JeuMemoire:
     def recacher_cartes(self):
         """Recache les deux cartes qui ne correspondaient pas."""
         for index in self.cartes_retournees:
-            self.boutons[index].config(text="", bg=COULEUR_CACHEE)
+            self.boutons[index].config(
+                text=SYMBOLE_DOS_CARTE, bg=COULEUR_CACHEE, activebackground=COULEUR_CACHEE,
+            )
         self.cartes_retournees = []
         self.clic_bloque = False
 
@@ -494,44 +531,51 @@ class JeuMemoire:
         sauvegarder_donnees(self.donnees)
 
     def afficher_victoire(self):
-        message = f"Vous avez trouvé toutes les paires en {self.nombre_coups} coups et {self.temps_ecoule} secondes !"
+        message = f"Vous avez trouvé toutes les paires en {self.nombre_coups} coups et {self.temps_ecoule} secondes ! 🎉"
         if self.dernier_resultat_est_record:
-            message += "\n\nNouveau record pour cette difficulté !"
+            message += "\n\n🌟 Nouveau record pour cette difficulté !"
         messagebox.showinfo("Bravo !", message)
         self.mettre_a_jour_record_affiche()
 
-    # ----- Statistiques -----
+    # ----- Statistiques (écran intégré à la fenêtre) -----
 
-    def afficher_statistiques(self):
-        fenetre_stats = tk.Toplevel(self.fenetre)
-        fenetre_stats.title("Statistiques")
-        fenetre_stats.configure(bg="#ffffff")
-        fenetre_stats.resizable(False, False)
+    def afficher_statistiques(self, origine="menu"):
+        """Construit et affiche l'écran de statistiques, dans la même
+        fenêtre. `origine` indique quel écran afficher au retour."""
+        self.ecran_precedent = origine
+
+        for widget in self.cadre_stats.winfo_children():
+            widget.destroy()
+
+        creer_bouton(self.cadre_stats, "🏠 Retour", self.retour_depuis_stats).pack(anchor="w", pady=(0, 10))
+
+        tk.Label(
+            self.cadre_stats, text="📊 Statistiques", font=POLICE_TITRE, fg=COULEUR_TITRE, bg=COULEUR_FOND,
+        ).pack(pady=(0, 10))
 
         stats = self.donnees.get("statistiques", {"parties_terminees": 0, "total_coups": 0, "total_temps": 0})
         parties = stats.get("parties_terminees", 0)
         moyenne_coups = stats["total_coups"] / parties if parties else 0
         moyenne_temps = stats["total_temps"] / parties if parties else 0
 
-        tk.Label(fenetre_stats, text=f"Parties terminées : {parties}", bg="#ffffff", anchor="w").pack(fill="x", padx=10, pady=(10, 0))
-        tk.Label(fenetre_stats, text=f"Moyenne de coups : {moyenne_coups:.1f}", bg="#ffffff", anchor="w").pack(fill="x", padx=10)
-        tk.Label(fenetre_stats, text=f"Temps moyen : {moyenne_temps:.1f} s", bg="#ffffff", anchor="w").pack(fill="x", padx=10, pady=(0, 10))
+        tk.Label(self.cadre_stats, text=f"Parties terminées : {parties}", font=POLICE_TEXTE, fg=COULEUR_TEXTE, bg=COULEUR_FOND, anchor="w").pack(fill="x")
+        tk.Label(self.cadre_stats, text=f"Moyenne de coups : {moyenne_coups:.1f}", font=POLICE_TEXTE, fg=COULEUR_TEXTE, bg=COULEUR_FOND, anchor="w").pack(fill="x")
+        tk.Label(self.cadre_stats, text=f"Temps moyen : {moyenne_temps:.1f} s", font=POLICE_TEXTE, fg=COULEUR_TEXTE, bg=COULEUR_FOND, anchor="w").pack(fill="x", pady=(0, 10))
 
-        tk.Label(fenetre_stats, text="Records par difficulté :", font=("Helvetica", 11, "bold"), bg="#ffffff", anchor="w").pack(fill="x", padx=10)
+        tk.Label(self.cadre_stats, text="🏆 Records par difficulté :", font=POLICE_INFO, fg=COULEUR_TEXTE, bg=COULEUR_FOND, anchor="w").pack(fill="x")
         records = self.donnees.get("records", {})
         if records:
             for difficulte, record in records.items():
                 tk.Label(
-                    fenetre_stats,
+                    self.cadre_stats,
                     text=f"{difficulte} : {record['meilleurs_coups']} coups en {record['meilleur_temps']} s",
-                    bg="#ffffff",
-                    anchor="w",
-                ).pack(fill="x", padx=20)
+                    font=POLICE_TEXTE, fg=COULEUR_TEXTE, bg=COULEUR_FOND, anchor="w",
+                ).pack(fill="x", padx=15)
         else:
-            tk.Label(fenetre_stats, text="Aucun record pour l'instant", bg="#ffffff", anchor="w").pack(fill="x", padx=20)
+            tk.Label(self.cadre_stats, text="Aucun record pour l'instant", font=POLICE_TEXTE, fg=COULEUR_TEXTE, bg=COULEUR_FOND, anchor="w").pack(fill="x", padx=15)
 
-        tk.Label(fenetre_stats, text="Historique récent :", font=("Helvetica", 11, "bold"), bg="#ffffff", anchor="w").pack(fill="x", padx=10, pady=(10, 0))
-        zone_texte = tk.Text(fenetre_stats, width=42, height=10, font=("Helvetica", 10))
+        tk.Label(self.cadre_stats, text="🕘 Historique récent :", font=POLICE_INFO, fg=COULEUR_TEXTE, bg=COULEUR_FOND, anchor="w").pack(fill="x", pady=(10, 0))
+        zone_texte = tk.Text(self.cadre_stats, width=42, height=10, font=POLICE_TEXTE, bg="#fff8fb", fg=COULEUR_TEXTE, relief="flat", bd=6)
         historique = self.donnees.get("historique", [])
         if historique:
             for partie in historique:
@@ -542,7 +586,33 @@ class JeuMemoire:
         else:
             zone_texte.insert(tk.END, "Aucune partie terminée pour l'instant.")
         zone_texte.config(state="disabled")
-        zone_texte.pack(padx=10, pady=10)
+        zone_texte.pack(pady=10)
+
+        self.masquer_tous_les_ecrans()
+        self.cadre_stats.pack(padx=20, pady=20)
+
+    def retour_depuis_stats(self):
+        if self.ecran_precedent == "jeu":
+            self.afficher_ecran_jeu()
+        else:
+            self.afficher_menu()
+
+    # ----- Règles du jeu (écran intégré à la fenêtre) -----
+
+    def construire_ecran_regles(self):
+        """Crée une seule fois l'écran des règles (contenu fixe)."""
+        creer_bouton(self.cadre_regles, "🏠 Retour", self.afficher_menu).pack(anchor="w", pady=(0, 10))
+        tk.Label(
+            self.cadre_regles, text="📖 Règles du jeu", font=POLICE_TITRE, fg=COULEUR_TITRE, bg=COULEUR_FOND,
+        ).pack(pady=(0, 10))
+        tk.Label(
+            self.cadre_regles, text=REGLES_DU_JEU, justify="left", wraplength=340,
+            font=POLICE_TEXTE, fg=COULEUR_TEXTE, bg=COULEUR_FOND,
+        ).pack()
+
+    def afficher_regles(self):
+        self.masquer_tous_les_ecrans()
+        self.cadre_regles.pack(padx=25, pady=20)
 
     # ----- Sauvegarde / fermeture -----
 
