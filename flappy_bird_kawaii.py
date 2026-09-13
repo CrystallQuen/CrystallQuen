@@ -109,7 +109,7 @@ class JeuFlappy:
         self.canvas.pack()
 
         self.canvas.bind("<Button-1>", lambda evenement: self.on_action())
-        self.fenetre.bind("<space>", lambda evenement: self.on_action())
+        self.fenetre.bind_all("<space>", lambda evenement: self.on_action())
 
         self.id_boucle = None
         self.bouton_rejouer = None

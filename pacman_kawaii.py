@@ -196,10 +196,10 @@ class JeuPacman:
         self.construire_ecran_jeu()
         self.construire_ecran_regles()
 
-        self.fenetre.bind("<Up>", lambda evenement: self.touche_pressee((-1, 0)))
-        self.fenetre.bind("<Down>", lambda evenement: self.touche_pressee((1, 0)))
-        self.fenetre.bind("<Left>", lambda evenement: self.touche_pressee((0, -1)))
-        self.fenetre.bind("<Right>", lambda evenement: self.touche_pressee((0, 1)))
+        self.fenetre.bind_all("<Up>", lambda evenement: self.touche_pressee((-1, 0)))
+        self.fenetre.bind_all("<Down>", lambda evenement: self.touche_pressee((1, 0)))
+        self.fenetre.bind_all("<Left>", lambda evenement: self.touche_pressee((0, -1)))
+        self.fenetre.bind_all("<Right>", lambda evenement: self.touche_pressee((0, 1)))
 
         self.afficher_menu()
 

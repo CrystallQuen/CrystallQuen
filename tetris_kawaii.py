@@ -358,13 +358,13 @@ class JeuTetris:
         self.construire_ecran_jeu()
         self.construire_ecran_regles()
 
-        self.fenetre.bind("<Left>", lambda evenement: self.deplacer_piece(0, -1))
-        self.fenetre.bind("<Right>", lambda evenement: self.deplacer_piece(0, 1))
-        self.fenetre.bind("<Down>", lambda evenement: self.chute_rapide())
-        self.fenetre.bind("<Up>", lambda evenement: self.tourner_piece())
-        self.fenetre.bind("<space>", lambda evenement: self.chute_totale())
-        self.fenetre.bind("<p>", lambda evenement: self.basculer_pause())
-        self.fenetre.bind("<P>", lambda evenement: self.basculer_pause())
+        self.fenetre.bind_all("<Left>", lambda evenement: self.deplacer_piece(0, -1))
+        self.fenetre.bind_all("<Right>", lambda evenement: self.deplacer_piece(0, 1))
+        self.fenetre.bind_all("<Down>", lambda evenement: self.chute_rapide())
+        self.fenetre.bind_all("<Up>", lambda evenement: self.tourner_piece())
+        self.fenetre.bind_all("<space>", lambda evenement: self.chute_totale())
+        self.fenetre.bind_all("<p>", lambda evenement: self.basculer_pause())
+        self.fenetre.bind_all("<P>", lambda evenement: self.basculer_pause())
 
         self.afficher_menu()
 

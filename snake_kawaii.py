@@ -159,12 +159,12 @@ class JeuSnake:
         self.construire_ecran_jeu()
         self.construire_ecran_regles()
 
-        self.fenetre.bind("<Up>", lambda evenement: self.touche_direction((-1, 0)))
-        self.fenetre.bind("<Down>", lambda evenement: self.touche_direction((1, 0)))
-        self.fenetre.bind("<Left>", lambda evenement: self.touche_direction((0, -1)))
-        self.fenetre.bind("<Right>", lambda evenement: self.touche_direction((0, 1)))
-        self.fenetre.bind("<p>", lambda evenement: self.basculer_pause())
-        self.fenetre.bind("<P>", lambda evenement: self.basculer_pause())
+        self.fenetre.bind_all("<Up>", lambda evenement: self.touche_direction((-1, 0)))
+        self.fenetre.bind_all("<Down>", lambda evenement: self.touche_direction((1, 0)))
+        self.fenetre.bind_all("<Left>", lambda evenement: self.touche_direction((0, -1)))
+        self.fenetre.bind_all("<Right>", lambda evenement: self.touche_direction((0, 1)))
+        self.fenetre.bind_all("<p>", lambda evenement: self.basculer_pause())
+        self.fenetre.bind_all("<P>", lambda evenement: self.basculer_pause())
 
         self.afficher_menu()
 
