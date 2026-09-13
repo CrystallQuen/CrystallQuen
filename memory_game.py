@@ -7,11 +7,12 @@ visibles, sinon elles se recachent après une courte pause. Le but est
 de retrouver toutes les paires en un minimum de coups et de temps.
 
 Fonctionnalités :
+- Menu de démarrage (nouvelle partie, reprise, statistiques, règles...).
 - Plusieurs niveaux de difficulté (taille de grille différente).
 - Chronomètre et compteur de coups.
 - Sauvegarde automatique des meilleurs scores et de l'historique des
   parties dans un fichier JSON à côté de ce script.
-- Reprise automatique d'une partie interrompue (fermeture de la
+- Reprise d'une partie interrompue (retour au menu ou fermeture de la
   fenêtre en cours de jeu).
 - Fenêtre de statistiques (records, moyenne de coups/temps, historique).
 """
@@ -46,6 +47,8 @@ COULEUR_TROUVEE = "#a5d6a7"     # couleur d'une paire trouvée
 
 DELAI_RETOURNEMENT_MS = 1000  # délai (ms) avant de recacher deux cartes
 
+LARGEUR_BOUTON_MENU = 26  # largeur commune des boutons du menu principal
+
 # Fichier de sauvegarde, toujours créé à côté de ce script.
 FICHIER_SAUVEGARDE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "memory_sauvegarde.json"
@@ -53,6 +56,18 @@ FICHIER_SAUVEGARDE = os.path.join(
 
 # Nombre maximal de parties conservées dans l'historique.
 TAILLE_HISTORIQUE = 20
+
+REGLES_DU_JEU = (
+    "Le but du jeu est de retrouver toutes les paires de cartes identiques.\n\n"
+    "- Cliquez sur une carte pour la retourner et découvrir son symbole.\n"
+    "- Vous pouvez retourner deux cartes maximum en même temps.\n"
+    "- Si les deux cartes correspondent, elles restent découvertes.\n"
+    "- Sinon, elles se recachent après environ 1 seconde.\n"
+    "- Chaque paire de cartes retournées compte pour un coup.\n"
+    "- La partie est terminée quand toutes les paires ont été trouvées.\n\n"
+    "Essayez de terminer en un minimum de coups et de temps pour battre "
+    "votre record !"
+)
 
 
 # ----- Fonctions de sauvegarde / chargement (fichier JSON) -----
@@ -98,7 +113,7 @@ def sauvegarder_donnees(donnees):
 
 
 class JeuMemoire:
-    """Classe principale qui gère la fenêtre et la logique du jeu."""
+    """Classe principale qui gère la fenêtre, le menu et la logique du jeu."""
 
     def __init__(self, fenetre):
         self.fenetre = fenetre
@@ -119,54 +134,151 @@ class JeuMemoire:
         self.boutons = []
         self.dernier_resultat_est_record = False
 
-        # ----- Barre du haut : difficulté -----
-        cadre_difficulte = tk.Frame(self.fenetre, bg="#ffffff")
-        cadre_difficulte.pack(pady=(10, 0))
-
-        tk.Label(cadre_difficulte, text="Difficulté :", bg="#ffffff").pack(side=tk.LEFT, padx=5)
-
         difficulte_initiale = self.donnees.get("derniere_difficulte") or next(iter(DIFFICULTES))
         self.difficulte_var = tk.StringVar(value=difficulte_initiale)
-        selecteur_difficulte = ttk.Combobox(
+
+        # Deux écrans distincts dans la même fenêtre : le menu principal
+        # et l'écran de jeu. On affiche l'un ou l'autre avec pack()/pack_forget().
+        self.cadre_menu = tk.Frame(self.fenetre, bg="#ffffff")
+        self.cadre_jeu = tk.Frame(self.fenetre, bg="#ffffff")
+
+        self.construire_ecran_jeu()
+        self.afficher_menu()
+
+    # ----- Écran de menu -----
+
+    def afficher_menu(self):
+        """Construit (ou reconstruit) et affiche le menu de démarrage."""
+        self.cadre_jeu.pack_forget()
+        for widget in self.cadre_menu.winfo_children():
+            widget.destroy()
+        self.cadre_menu.pack(padx=30, pady=20)
+
+        tk.Label(
+            self.cadre_menu, text="Jeu de Mémoire", font=("Helvetica", 20, "bold"), bg="#ffffff"
+        ).pack(pady=(0, 15))
+
+        cadre_difficulte = tk.Frame(self.cadre_menu, bg="#ffffff")
+        cadre_difficulte.pack(pady=(0, 10))
+        tk.Label(cadre_difficulte, text="Difficulté :", bg="#ffffff").pack(side=tk.LEFT, padx=5)
+        ttk.Combobox(
             cadre_difficulte,
             textvariable=self.difficulte_var,
             values=list(DIFFICULTES.keys()),
             state="readonly",
             width=14,
+        ).pack(side=tk.LEFT, padx=5)
+
+        tk.Button(
+            self.cadre_menu, text="Nouvelle partie", font=("Helvetica", 12),
+            width=LARGEUR_BOUTON_MENU, command=self.demarrer_nouvelle_partie_depuis_menu,
+        ).pack(pady=4)
+
+        bouton_reprendre = tk.Button(
+            self.cadre_menu, text="Reprendre la partie", font=("Helvetica", 12),
+            width=LARGEUR_BOUTON_MENU, command=self.reprendre_partie_depuis_menu,
         )
-        selecteur_difficulte.pack(side=tk.LEFT, padx=5)
-        selecteur_difficulte.bind("<<ComboboxSelected>>", lambda evenement: self.mettre_a_jour_record_affiche())
+        bouton_reprendre.pack(pady=4)
+        if not self.donnees.get("partie_en_cours"):
+            bouton_reprendre.config(state="disabled")
 
-        # ----- Barre du haut : coups, chrono, record, boutons -----
-        cadre_haut = tk.Frame(self.fenetre, bg="#ffffff")
-        cadre_haut.pack(pady=10)
+        tk.Button(
+            self.cadre_menu, text="Statistiques", font=("Helvetica", 12),
+            width=LARGEUR_BOUTON_MENU, command=self.afficher_statistiques,
+        ).pack(pady=4)
 
-        self.label_coups = tk.Label(cadre_haut, text="Coups : 0", font=("Helvetica", 12, "bold"), bg="#ffffff")
+        tk.Button(
+            self.cadre_menu, text="Règles du jeu", font=("Helvetica", 12),
+            width=LARGEUR_BOUTON_MENU, command=self.afficher_regles,
+        ).pack(pady=4)
+
+        tk.Button(
+            self.cadre_menu, text="Réinitialiser les statistiques", font=("Helvetica", 12),
+            width=LARGEUR_BOUTON_MENU, command=self.reinitialiser_statistiques,
+        ).pack(pady=4)
+
+        tk.Button(
+            self.cadre_menu, text="Quitter", font=("Helvetica", 12),
+            width=LARGEUR_BOUTON_MENU, command=self.fenetre.destroy,
+        ).pack(pady=(4, 0))
+
+    def demarrer_nouvelle_partie_depuis_menu(self):
+        if self.donnees.get("partie_en_cours") and not messagebox.askyesno(
+            "Nouvelle partie",
+            "Une partie sauvegardée existe. La remplacer par une nouvelle partie ?",
+        ):
+            return
+        self.nouvelle_partie()
+        self.afficher_ecran_jeu()
+
+    def reprendre_partie_depuis_menu(self):
+        partie_sauvee = self.donnees.get("partie_en_cours")
+        if not partie_sauvee:
+            return
+        self.reprendre_partie(partie_sauvee)
+        self.afficher_ecran_jeu()
+
+    def afficher_regles(self):
+        fenetre_regles = tk.Toplevel(self.fenetre)
+        fenetre_regles.title("Règles du jeu")
+        fenetre_regles.configure(bg="#ffffff")
+        fenetre_regles.resizable(False, False)
+        tk.Label(
+            fenetre_regles, text=REGLES_DU_JEU, justify="left", wraplength=320,
+            bg="#ffffff", padx=15, pady=15,
+        ).pack()
+
+    def reinitialiser_statistiques(self):
+        if not messagebox.askyesno(
+            "Réinitialiser les statistiques",
+            "Effacer tous les records, l'historique et les statistiques ? "
+            "Cette action est irréversible.",
+        ):
+            return
+        self.donnees["records"] = {}
+        self.donnees["historique"] = []
+        self.donnees["statistiques"] = {"parties_terminees": 0, "total_coups": 0, "total_temps": 0}
+        sauvegarder_donnees(self.donnees)
+        messagebox.showinfo("Réinitialisation", "Les statistiques ont été réinitialisées.")
+
+    # ----- Écran de jeu -----
+
+    def construire_ecran_jeu(self):
+        """Crée une seule fois les widgets fixes de l'écran de jeu (les
+        infos en haut et le cadre qui accueillera la grille de cartes)."""
+        cadre_info = tk.Frame(self.cadre_jeu, bg="#ffffff")
+        cadre_info.pack(pady=10)
+
+        self.label_difficulte_jeu = tk.Label(cadre_info, text="", font=("Helvetica", 11), bg="#ffffff")
+        self.label_difficulte_jeu.pack(side=tk.LEFT, padx=8)
+
+        self.label_coups = tk.Label(cadre_info, text="Coups : 0", font=("Helvetica", 12, "bold"), bg="#ffffff")
         self.label_coups.pack(side=tk.LEFT, padx=8)
 
-        self.label_chrono = tk.Label(cadre_haut, text="Temps : 0 s", font=("Helvetica", 12, "bold"), bg="#ffffff")
+        self.label_chrono = tk.Label(cadre_info, text="Temps : 0 s", font=("Helvetica", 12, "bold"), bg="#ffffff")
         self.label_chrono.pack(side=tk.LEFT, padx=8)
 
-        self.label_record = tk.Label(cadre_haut, text="Record : aucun", font=("Helvetica", 12), bg="#ffffff")
+        self.label_record = tk.Label(cadre_info, text="Record : aucun", font=("Helvetica", 12), bg="#ffffff")
         self.label_record.pack(side=tk.LEFT, padx=8)
 
-        tk.Button(cadre_haut, text="Nouvelle partie", font=("Helvetica", 11), command=self.demander_nouvelle_partie).pack(side=tk.LEFT, padx=5)
-        tk.Button(cadre_haut, text="Statistiques", font=("Helvetica", 11), command=self.afficher_statistiques).pack(side=tk.LEFT, padx=5)
-
-        # ----- Zone de la grille de cartes -----
-        self.cadre_grille = tk.Frame(self.fenetre, bg="#ffffff")
+        self.cadre_grille = tk.Frame(self.cadre_jeu, bg="#ffffff")
         self.cadre_grille.pack(padx=10, pady=10)
 
-        # Si une partie était en cours lors de la dernière fermeture, on
-        # propose au joueur de la reprendre.
-        partie_sauvee = self.donnees.get("partie_en_cours")
-        if partie_sauvee and messagebox.askyesno(
-            "Reprendre la partie", "Une partie était en cours. Voulez-vous la reprendre ?"
-        ):
-            self.reprendre_partie(partie_sauvee)
-        else:
-            self.donnees["partie_en_cours"] = None
-            self.nouvelle_partie()
+        cadre_boutons_jeu = tk.Frame(self.cadre_jeu, bg="#ffffff")
+        cadre_boutons_jeu.pack(pady=(0, 10))
+        tk.Button(cadre_boutons_jeu, text="Recommencer", font=("Helvetica", 11), command=self.demander_nouvelle_partie).pack(side=tk.LEFT, padx=5)
+        tk.Button(cadre_boutons_jeu, text="Statistiques", font=("Helvetica", 11), command=self.afficher_statistiques).pack(side=tk.LEFT, padx=5)
+        tk.Button(cadre_boutons_jeu, text="Menu principal", font=("Helvetica", 11), command=self.retour_menu).pack(side=tk.LEFT, padx=5)
+
+    def afficher_ecran_jeu(self):
+        self.cadre_menu.pack_forget()
+        self.cadre_jeu.pack(padx=10, pady=10)
+
+    def retour_menu(self):
+        """Sauvegarde la partie en cours (si besoin) et revient au menu."""
+        self.arreter_chrono()
+        self.sauvegarder_partie_en_cours()
+        self.afficher_menu()
 
     # ----- Gestion de la difficulté -----
 
@@ -186,11 +298,11 @@ class JeuMemoire:
     # ----- Démarrage / reprise de partie -----
 
     def demander_nouvelle_partie(self):
-        """Appelée par le bouton « Nouvelle partie » : demande confirmation
+        """Appelée par le bouton « Recommencer » : demande confirmation
         si une partie non terminée risque d'être perdue."""
         if not self.partie_terminee and self.nombre_coups > 0:
             if not messagebox.askyesno(
-                "Nouvelle partie", "Une partie est en cours. L'abandonner et en commencer une nouvelle ?"
+                "Recommencer", "Une partie est en cours. L'abandonner et en commencer une nouvelle ?"
             ):
                 return
         self.nouvelle_partie()
@@ -211,6 +323,7 @@ class JeuMemoire:
         self.temps_ecoule = 0
         self.partie_terminee = False
 
+        self.label_difficulte_jeu.config(text=f"Difficulté : {self.difficulte_var.get()}")
         self.label_coups.config(text="Coups : 0")
         self.label_chrono.config(text="Temps : 0 s")
         self.mettre_a_jour_record_affiche()
@@ -248,6 +361,7 @@ class JeuMemoire:
         self.clic_bloque = False
         self.partie_terminee = False
 
+        self.label_difficulte_jeu.config(text=f"Difficulté : {difficulte}")
         self.label_coups.config(text=f"Coups : {self.nombre_coups}")
         self.label_chrono.config(text=f"Temps : {self.temps_ecoule} s")
         self.mettre_a_jour_record_affiche()
@@ -430,12 +544,12 @@ class JeuMemoire:
         zone_texte.config(state="disabled")
         zone_texte.pack(padx=10, pady=10)
 
-    # ----- Fermeture de la fenêtre -----
+    # ----- Sauvegarde / fermeture -----
 
-    def fermer_fenetre(self):
-        """Sauvegarde la partie en cours (si elle n'est pas terminée)
-        avant de fermer la fenêtre, pour pouvoir la reprendre plus tard."""
-        if not self.partie_terminee:
+    def sauvegarder_partie_en_cours(self):
+        """Enregistre l'état de la partie en cours sur le disque si elle
+        n'est pas terminée, pour pouvoir la reprendre plus tard."""
+        if not self.partie_terminee and hasattr(self, "symboles_grille"):
             self.donnees["partie_en_cours"] = {
                 "difficulte": self.difficulte_var.get(),
                 "symboles": self.symboles_grille,
@@ -444,6 +558,12 @@ class JeuMemoire:
                 "temps": self.temps_ecoule,
             }
             sauvegarder_donnees(self.donnees)
+
+    def fermer_fenetre(self):
+        """Sauvegarde la partie en cours (si besoin) avant de fermer la
+        fenêtre, pour pouvoir la reprendre plus tard."""
+        self.arreter_chrono()
+        self.sauvegarder_partie_en_cours()
         self.fenetre.destroy()
 
 
