@@ -76,7 +76,7 @@ FICHIER_SAUVEGARDE = os.path.join(
 
 # Petite mélodie chiptune en boucle, propre à ce jeu.
 FICHIER_MUSIQUE = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "musiques", "flappy.wav"
+    os.path.dirname(os.path.abspath(__file__)), "flappy.wav"
 )
 
 

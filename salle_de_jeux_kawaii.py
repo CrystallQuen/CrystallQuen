@@ -72,26 +72,48 @@ JEUX_CONNUS = {
 PREFIXES_IGNORES = ("test_", "generer_", "_")
 
 
+def lister_scripts_python(dossier):
+    """Renvoie les noms des fichiers .py directement dans `dossier`
+    (sans descendre plus bas), à l'exclusion des scripts ignorés."""
+    try:
+        noms = os.listdir(dossier)
+    except OSError:
+        return []
+    return [
+        nom for nom in noms
+        if nom.endswith(".py") and not nom.startswith(PREFIXES_IGNORES)
+    ]
+
+
 def decouvrir_jeux():
-    """Cherche tous les jeux (.py) présents dans ce dossier, en dehors
-    de ce script lui-même. Renvoie une liste de dictionnaires triée par
-    titre, prête à être affichée."""
+    """Cherche tous les jeux (.py) présents dans ce dossier — soit
+    directement, soit un niveau plus bas dans un sous-dossier (chaque
+    jeu peut avoir son propre sous-dossier, avec sa sauvegarde et sa
+    musique à côté) — en dehors de ce script lui-même. Renvoie une
+    liste de dictionnaires triée par titre, prête à être affichée."""
     dossier = os.path.dirname(os.path.abspath(__file__))
     nom_de_ce_script = os.path.basename(__file__)
 
-    jeux = []
-    for nom_fichier in os.listdir(dossier):
-        if not nom_fichier.endswith(".py"):
-            continue
-        if nom_fichier == nom_de_ce_script:
-            continue
-        if nom_fichier.startswith(PREFIXES_IGNORES):
-            continue
+    chemins_candidats = []
 
+    for nom_fichier in lister_scripts_python(dossier):
+        if nom_fichier != nom_de_ce_script:
+            chemins_candidats.append(os.path.join(dossier, nom_fichier))
+
+    for nom_entree in sorted(os.listdir(dossier)):
+        sous_dossier = os.path.join(dossier, nom_entree)
+        if not os.path.isdir(sous_dossier) or nom_entree.startswith((".", "_")):
+            continue
+        for nom_fichier in lister_scripts_python(sous_dossier):
+            chemins_candidats.append(os.path.join(sous_dossier, nom_fichier))
+
+    jeux = []
+    for chemin in chemins_candidats:
+        nom_fichier = os.path.basename(chemin)
         info = JEUX_CONNUS.get(nom_fichier, {})
         titre_par_defaut = nom_fichier[:-3].replace("_", " ").title()
         jeux.append({
-            "fichier": os.path.join(dossier, nom_fichier),
+            "fichier": chemin,
             "titre": info.get("titre", titre_par_defaut),
             "icone": info.get("icone", "🎮"),
             "description": info.get("description", ""),
