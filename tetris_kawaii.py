@@ -4,7 +4,9 @@ Tetris Kawaii en Python avec Tkinter.
 Les pièces colorées tombent depuis le haut du plateau : il faut les
 empiler pour compléter des lignes entières, qui disparaissent alors et
 rapportent des points. Plus vous en faites disparaître d'un coup, plus
-le bonus est gros !
+le bonus est gros ! En plus des 7 pièces classiques, quelques formes
+bonus plus originales (croix, escalier, cœur) apparaissent de temps en
+temps pour varier le jeu.
 
 Comme le jeu de Mémoire, tout se passe dans une seule fenêtre : un
 menu de démarrage permet de lancer une partie, de consulter les
@@ -36,9 +38,9 @@ DELAI_CHUTE_INITIAL = 500  # ms entre deux descentes automatiques au niveau 1
 TAILLE_HISTORIQUE = 10
 
 # ----- Les 7 pièces classiques et leurs 4 rotations -----
-# Chaque rotation est une liste de 4 cases (ligne, colonne) données par
+# Chaque rotation est une liste de cases (ligne, colonne) données par
 # rapport à un coin d'origine de la pièce.
-PIECES = {
+PIECES_CLASSIQUES = {
     "I": [
         [(1, 0), (1, 1), (1, 2), (1, 3)],
         [(0, 2), (1, 2), (2, 2), (3, 2)],
@@ -78,6 +80,38 @@ PIECES = {
     ],
 }
 
+# ----- Formes bonus « kawaii », plus rares, en plus des 7 classiques -----
+PIECES_BONUS = {
+    "CROIX": [[(0, 1), (1, 0), (1, 1), (1, 2), (2, 1)]] * 4,
+    "ESCALIER": [
+        [(0, 0), (1, 0), (1, 1), (2, 1), (2, 2)],
+        [(0, 2), (0, 1), (1, 1), (1, 0), (2, 0)],
+        [(2, 2), (1, 2), (1, 1), (0, 1), (0, 0)],
+        [(2, 0), (2, 1), (1, 1), (1, 2), (0, 2)],
+    ],
+    "COEUR": [
+        [(0, 0), (0, 2), (1, 0), (1, 1), (1, 2), (2, 1)],
+        [(0, 2), (2, 2), (0, 1), (1, 1), (2, 1), (1, 0)],
+        [(2, 2), (2, 0), (1, 2), (1, 1), (1, 0), (0, 1)],
+        [(2, 0), (0, 0), (2, 1), (1, 1), (0, 1), (1, 2)],
+    ],
+}
+
+# Dictionnaire combiné utilisé pour tout le reste du code : peu importe
+# qu'une pièce soit classique ou bonus, elle s'y trouve avec ses rotations.
+PIECES = {**PIECES_CLASSIQUES, **PIECES_BONUS}
+
+PROBABILITE_PIECE_BONUS = 0.15  # ~15% de chances qu'une pièce bonus apparaisse
+BONUS_POINTS_PIECE_SPECIALE = 30  # petit bonus de points quand une pièce bonus se pose
+
+
+def tirer_type_piece():
+    """Choisit le type de la prochaine pièce : le plus souvent une pièce
+    classique, parfois une forme bonus plus originale."""
+    if random.random() < PROBABILITE_PIECE_BONUS:
+        return random.choice(list(PIECES_BONUS.keys()))
+    return random.choice(list(PIECES_CLASSIQUES.keys()))
+
 # ----- Palette de couleurs « kawaii » -----
 COULEUR_FOND = "#fff0f6"
 COULEUR_TITRE = "#d6336c"
@@ -93,6 +127,9 @@ COULEURS_PIECES = {
     "Z": "#ff8fa3",
     "J": "#8ecae6",
     "L": "#ffb98a",
+    "CROIX": "#ffd1dc",
+    "ESCALIER": "#d4b8ff",
+    "COEUR": "#ff6f91",
 }
 
 POLICE_TITRE = ("Comic Sans MS", 22, "bold")
@@ -119,7 +156,10 @@ REGLES_DU_JEU = (
     "vous en faites disparaître d'un coup, plus le bonus est gros ! "
     "Le niveau augmente (et les pièces tombent plus vite) toutes les "
     "10 lignes. La partie se termine quand les pièces atteignent le "
-    "haut du plateau."
+    "haut du plateau.\n\n"
+    "De temps en temps, une forme bonus plus originale apparaît (une "
+    "croix, un escalier ou même un petit cœur !) : elle rapporte "
+    "quelques points de plus dès qu'elle se pose."
 )
 
 
@@ -304,7 +344,7 @@ class JeuTetris:
         self.label_lignes.config(text="Lignes : 0")
         self.label_meilleur.config(text=f"Meilleur score : {self.donnees.get('meilleur_score', 0)}")
 
-        self.piece_suivante_type = random.choice(list(PIECES.keys()))
+        self.piece_suivante_type = tirer_type_piece()
         self.apparition_nouvelle_piece()
         if self.etat == "jeu":
             self.dessiner_plateau_et_piece()
@@ -312,7 +352,7 @@ class JeuTetris:
 
     def apparition_nouvelle_piece(self):
         self.piece_type = self.piece_suivante_type
-        self.piece_suivante_type = random.choice(list(PIECES.keys()))
+        self.piece_suivante_type = tirer_type_piece()
         self.piece_rotation = 0
         self.piece_ligne = -1
         self.piece_colonne = 3
@@ -408,6 +448,10 @@ class JeuTetris:
                 self.terminer_partie()
                 return
             self.plateau[l][c] = self.piece_couleur
+
+        if self.piece_type in PIECES_BONUS:
+            self.score += BONUS_POINTS_PIECE_SPECIALE
+            self.label_score.config(text=f"Score : {self.score}")
 
         self.effacer_lignes_completes()
         self.apparition_nouvelle_piece()
