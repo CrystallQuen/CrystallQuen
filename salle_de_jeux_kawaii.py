@@ -65,6 +65,10 @@ JEUX_CONNUS = {
         "titre": "Fruit Ninja Kawaii", "icone": "🍉",
         "description": "Tranche les fruits, évite les bombes",
     },
+    "labyrinthe_3d_kawaii.py": {
+        "titre": "Labyrinthe 3D Kawaii", "icone": "🌀",
+        "description": "Explore en pseudo-3D, trouve la sortie",
+    },
 }
 
 # Fichiers à ignorer même s'ils se terminent par .py (scripts utilitaires,
