@@ -69,6 +69,10 @@ JEUX_CONNUS = {
         "titre": "Mario Kart Kawaii", "icone": "🏎️",
         "description": "Course en pseudo-3D, 3 tours de circuit",
     },
+    "arene_tactique_dofus.py": {
+        "titre": "Arène Tactique", "icone": "⚔️",
+        "description": "Combat au tour par tour, style Dofus",
+    },
 }
 
 # Fichiers à ignorer même s'ils se terminent par .py (scripts utilitaires,
